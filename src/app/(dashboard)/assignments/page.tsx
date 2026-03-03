@@ -65,7 +65,7 @@ export default function AssignmentsPage() {
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(340px, 1fr))', gap: 20 }}>
                     {filtered.map((s) => {
                         const teacher = (s as any).teacher as Teacher;
-                        const waLink = teacher ? generateWhatsAppLink(teacher.mobile, teacher.name, s.name, s.standard, s.address, s.preferred_day, s.preferred_slot, s.mobile) : '';
+                        const waLink = teacher ? generateWhatsAppLink(teacher.mobile, teacher.name, s.name, s.standard, s.address, s.preferred_day, s.preferred_slot, s.mobile, s.preferred_date) : '';
                         return (
                             <div key={s.id} className="card-hover" style={{
                                 background: '#1e293b', borderRadius: 16, border: '1px solid #334155',
@@ -91,7 +91,7 @@ export default function AssignmentsPage() {
                                 <div style={{ marginBottom: 16 }}>
                                     <div style={{ fontWeight: 700, fontSize: 17, color: '#f1f5f9', marginBottom: 4 }}>{s.name}</div>
                                     <div style={{ fontSize: 12, color: '#64748b' }}>
-                                        {s.standard} · {s.board} · {s.subject}
+                                        {s.standard} · {s.board} · {s.subjects.join(', ')}
                                     </div>
                                     <div style={{ fontSize: 12, color: '#64748b', marginTop: 2 }}>
                                         📞 {s.mobile} · Parent: {s.parent_name}
