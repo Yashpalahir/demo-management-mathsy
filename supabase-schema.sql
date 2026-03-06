@@ -84,3 +84,29 @@ insert into teachers (name, mobile, subjects, available_days, available_slots, s
   ('Rajesh Kumar', '9876543210', array['Mathematics', 'Physics'], array['Monday', 'Wednesday', 'Friday'], array['6:00 AM - 7:00 AM', '4:00 PM - 5:00 PM', '5:00 PM - 6:00 PM'], 'active'),
   ('Priya Sharma', '9123456789', array['English', 'Hindi'], array['Tuesday', 'Thursday', 'Saturday'], array['7:00 AM - 8:00 AM', '3:00 PM - 4:00 PM'], 'active'),
   ('Amit Singh', '9988776655', array['Chemistry', 'Biology'], array['Monday', 'Tuesday', 'Wednesday'], array['8:00 AM - 9:00 AM', '6:00 PM - 7:00 PM'], 'active');
+
+
+-- Update students table
+alter table students add column if not exists comment text;
+alter table students add column if not exists fee_discussion text;
+alter table students add column if not exists finalized_fees bigint default 0;
+
+-- Create payments table
+create table if not exists payments (
+  id uuid default uuid_generate_v4() primary key,
+  student_id uuid references students(id) on delete cascade not null,
+  amount numeric not null,
+  months_paid integer default 1,
+  payment_date timestamptz default now(),
+  status text default 'paid' check (status in ('paid', 'pending')),
+  remarks text,
+  created_at timestamptz default now()
+);
+
+-- Enable RLS for payments
+alter table payments enable row level security;
+create policy " Allow all for payments\ on payments for all using (true) with check (true);
+
+-- Index for payments
+create index if not exists idx_payments_student on payments(student_id);
+

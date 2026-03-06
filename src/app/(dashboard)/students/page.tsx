@@ -80,7 +80,7 @@ export default function StudentsPage() {
                 await fetch('/api/sync-sheet', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ student: assignModal, teacher }),
+                    body: JSON.stringify({ type: 'assignment', student: assignModal, teacher }),
                 });
             } catch (err) {
                 console.error('Sheet Sync Error:', err);

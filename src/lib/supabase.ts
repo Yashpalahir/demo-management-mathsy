@@ -33,7 +33,21 @@ export type Student = {
     status: 'unassigned' | 'assigned' | 'finalized' | 'not_interested';
     demo_status: 'pending' | 'successful' | 'failed' | null;
     created_at: string;
+    comment?: string;
+    fee_discussion?: string;
+    finalized_fees?: number;
     teacher?: Teacher;
+};
+
+export type Payment = {
+    id: string;
+    student_id: string;
+    amount: number;
+    months_paid: number;
+    payment_date: string;
+    status: 'paid' | 'pending';
+    remarks?: string;
+    created_at: string;
 };
 
 export type TimeSlot = {

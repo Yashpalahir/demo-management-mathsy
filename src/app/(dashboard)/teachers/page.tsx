@@ -4,7 +4,8 @@ import { useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import { type Teacher } from '@/lib/supabase';
 import { SUBJECTS, DAYS, TIME_SLOTS } from '@/lib/constants';
-import { Users, Plus, Pencil, Trash2, Phone, X, Check, Save } from 'lucide-react';
+import { Users, Plus, Pencil, Trash2, Phone, X, Check, Save, Download } from 'lucide-react';
+import { exportToExcel } from '@/lib/excel';
 
 type TeacherForm = Omit<Teacher, 'id' | 'created_at'>;
 
@@ -100,6 +101,18 @@ export default function TeachersPage() {
         t.subjects.some((s) => s.toLowerCase().includes(search.toLowerCase()))
     );
 
+    const handleExport = () => {
+        const data = filtered.map(t => ({
+            'Name': t.name,
+            'Mobile': t.mobile,
+            'Subjects': t.subjects.join(', '),
+            'Available Days': t.available_days.join(', '),
+            'Status': t.status,
+            'Slots': t.available_slots.join(', ')
+        }));
+        exportToExcel(data, `Teachers_Export_${new Date().toISOString().split('T')[0]}`);
+    };
+
     // Group slots by day for display
     const groupSlotsByDay = (slots: string[]) => {
         const grouped: Record<string, string[]> = {};
@@ -138,6 +151,9 @@ export default function TeachersPage() {
                         value={search}
                         onChange={(e) => setSearch(e.target.value)}
                     />
+                    <button className="btn-secondary" onClick={handleExport} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <Download size={16} /> Export
+                    </button>
                     <button className="btn-primary" onClick={openAdd}>
                         <Plus size={16} /> Add Teacher
                     </button>

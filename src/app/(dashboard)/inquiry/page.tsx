@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import { SUBJECTS, DAYS, TIME_SLOTS, BOARDS, STANDARDS } from '@/lib/constants';
-import { BookOpen, Send, CheckCircle, User, Phone, MapPin, BookMarked, Calendar, Clock } from 'lucide-react';
+import { BookOpen, Send, CheckCircle, User, Phone, MapPin, BookMarked, Calendar, Clock, MessageCircle } from 'lucide-react';
 
 const labelStyle: React.CSSProperties = {
     display: 'flex', alignItems: 'center', gap: 6,
@@ -22,6 +22,8 @@ export default function InquiryPage() {
     const [preferredDay, setPreferredDay] = useState('');
     const [preferredDate, setPreferredDate] = useState('');
     const [preferredSlot, setPreferredSlot] = useState('');
+    const [comment, setComment] = useState('');
+    const [feeDiscussion, setFeeDiscussion] = useState('');
 
     const [submitting, setSubmitting] = useState(false);
     const [submitted, setSubmitted] = useState(false);
@@ -39,6 +41,8 @@ export default function InquiryPage() {
         setPreferredDay('');
         setPreferredDate('');
         setPreferredSlot('');
+        setComment('');
+        setFeeDiscussion('');
     };
 
     const toggleSubject = (s: string) => {
@@ -68,6 +72,8 @@ export default function InquiryPage() {
                 preferred_day: preferredDay,
                 preferred_date: preferredDate || null,
                 preferred_slot: preferredSlot,
+                comment: comment || null,
+                fee_discussion: feeDiscussion || null,
                 status: 'unassigned',
                 assigned_teacher_id: null,
             }]);
@@ -315,6 +321,41 @@ export default function InquiryPage() {
                             </select>
                         </div>
 
+                    </div>
+                </div>
+
+                {/* Additional Details */}
+                <div style={{
+                    background: '#1e293b', borderRadius: 20, border: '1px solid #334155',
+                    padding: 28, marginBottom: 28,
+                }}>
+                    <h2 style={{ fontSize: 15, fontWeight: 700, color: '#818cf8', marginBottom: 20, display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <MessageCircle size={16} /> Additional Details
+                    </h2>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 20 }}>
+                        <div style={{ gridColumn: '1 / -1' }}>
+                            <label style={labelStyle}>
+                                Comment (Optional)
+                            </label>
+                            <textarea
+                                className="input-field"
+                                placeholder="Any specific requirements or notes?"
+                                value={comment}
+                                onChange={(e) => setComment(e.target.value)}
+                                style={{ minHeight: 80, resize: 'vertical' }}
+                            />
+                        </div>
+                        <div style={{ gridColumn: '1 / -1' }}>
+                            <label style={labelStyle}>
+                                Fee Discussion (Optional)
+                            </label>
+                            <input
+                                className="input-field"
+                                placeholder="Details about fee discussion"
+                                value={feeDiscussion}
+                                onChange={(e) => setFeeDiscussion(e.target.value)}
+                            />
+                        </div>
                     </div>
                 </div>
 

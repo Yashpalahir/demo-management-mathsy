@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import {
     LayoutDashboard, Users, GraduationCap, UserCheck,
-    BookOpen, LogOut, Menu, X, ChevronRight, Activity
+    BookOpen, LogOut, Menu, X, ChevronRight, Activity, Wallet
 } from 'lucide-react';
 
 const navItems = [
@@ -14,6 +14,7 @@ const navItems = [
     { href: '/teachers', label: 'Teachers', icon: Users },
     { href: '/assignments', label: 'Assignments', icon: UserCheck },
     { href: '/demo-tracking', label: 'Demo Tracking', icon: Activity },
+    { href: '/fees', label: 'Fees Management', icon: Wallet },
     { href: '/inquiry', label: 'New Inquiry', icon: BookOpen },
 ];
 

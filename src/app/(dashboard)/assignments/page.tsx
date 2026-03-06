@@ -4,7 +4,8 @@ import { useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import { type Student, type Teacher } from '@/lib/supabase';
 import { generateWhatsAppLink, formatDate } from '@/lib/utils';
-import { UserCheck, MessageCircle, Search, Filter, CheckCircle2, CheckCircle, XCircle } from 'lucide-react';
+import { UserCheck, MessageCircle, Search, Filter, CheckCircle2, CheckCircle, XCircle, Download } from 'lucide-react';
+import { exportToExcel } from '@/lib/excel';
 
 export default function AssignmentsPage() {
     const [assignments, setAssignments] = useState<Student[]>([]);
@@ -73,6 +74,20 @@ export default function AssignmentsPage() {
         ((s as any).teacher as Teacher)?.name?.toLowerCase().includes(search.toLowerCase())
     );
 
+    const handleExport = () => {
+        const data = filtered.map(s => ({
+            'Student': s.name,
+            'Standard': s.standard,
+            'Subjects': s.subjects.join(', '),
+            'Teacher': (s as any).teacher?.name || 'N/A',
+            'Day': s.preferred_day,
+            'Slot': s.preferred_slot,
+            'Status': s.status,
+            'Demo Status': s.demo_status || 'Pending'
+        }));
+        exportToExcel(data, `Assignments_Export_${new Date().toISOString().split('T')[0]}`);
+    };
+
     return (
         <div className="animate-fadeIn">
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 28, flexWrap: 'wrap', gap: 16 }}>
@@ -89,9 +104,14 @@ export default function AssignmentsPage() {
                     </div>
                     <p style={{ color: '#94a3b8', fontSize: 14 }}>{assignments.length} demos currently scheduled</p>
                 </div>
-                <div style={{ position: 'relative' }}>
-                    <Search size={15} style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: '#475569' }} />
-                    <input className="input-field" style={{ paddingLeft: 36, width: 220 }} placeholder="Search assignments..." value={search} onChange={(e) => setSearch(e.target.value)} />
+                <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
+                    <div style={{ position: 'relative' }}>
+                        <Search size={15} style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: '#475569' }} />
+                        <input className="input-field" style={{ paddingLeft: 36, width: 220 }} placeholder="Search assignments..." value={search} onChange={(e) => setSearch(e.target.value)} />
+                    </div>
+                    <button className="btn-secondary" onClick={handleExport} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <Download size={16} /> Export
+                    </button>
                 </div>
             </div>
 
