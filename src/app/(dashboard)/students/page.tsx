@@ -6,7 +6,7 @@ import { type Student, type Teacher, type TimeSlot } from '@/lib/supabase';
 import { generateWhatsAppLink, formatDate } from '@/lib/utils';
 import { SUBJECTS, DAYS, TIME_SLOTS, BOARDS, STANDARDS } from '@/lib/constants';
 import { exportToExcel } from '@/lib/excel';
-import { GraduationCap, UserCheck, UserX, Search, MessageCircle, UserPlus, X, Calendar, Phone, Clock, BookMarked, Pencil, Trash2, MapPin, Save, Download } from 'lucide-react';
+import { GraduationCap, UserCheck, UserX, Search, MessageCircle, UserPlus, X, Calendar, Phone, Clock, BookMarked, Pencil, Trash2, MapPin, Save, Download, Check, CheckCircle } from 'lucide-react';
 
 export default function StudentsPage() {
     const [students, setStudents] = useState<Student[]>([]);
@@ -23,6 +23,8 @@ export default function StudentsPage() {
 
     const [editModal, setEditModal] = useState<Student | null>(null);
     const [saving, setSaving] = useState(false);
+
+    const [demoOutcomeModal, setDemoOutcomeModal] = useState<Student | null>(null);
 
     useEffect(() => { fetchAll(); }, []);
 
@@ -44,7 +46,9 @@ export default function StudentsPage() {
         const matches = teachers.filter((t) => {
             const subjectMatch = student.subjects.some(s => t.subjects.includes(s));
             const dayMatch = t.available_days.includes(student.preferred_day);
-            const slotMatch = t.available_slots.includes(student.preferred_slot);
+            // Updated for day-wise slots: Day|Slot format
+            const slotMatch = t.available_slots.includes(`${student.preferred_day}|${student.preferred_slot}`);
+
             const isAlreadyBooked = bookedSlots.some(
                 (slot) => slot.teacher_id === t.id &&
                     slot.day === student.preferred_day &&
@@ -60,7 +64,7 @@ export default function StudentsPage() {
         setAssigning(true);
         try {
             await supabase.from('students')
-                .update({ assigned_teacher_id: teacher.id, status: 'assigned' })
+                .update({ assigned_teacher_id: teacher.id, status: 'assigned', demo_status: 'pending' })
                 .eq('id', assignModal.id);
 
             await supabase.from('timeslots').upsert({
@@ -89,13 +93,53 @@ export default function StudentsPage() {
         }
     };
 
+    const handleDemoOutcome = async (outcome: 'successful' | 'failed' | 'not_interested') => {
+        if (!demoOutcomeModal) return;
+        setSaving(true);
+        try {
+            let res;
+            if (outcome === 'successful') {
+                res = await supabase.from('students')
+                    .update({ status: 'finalized', demo_status: 'successful' })
+                    .eq('id', demoOutcomeModal.id);
+            } else if (outcome === 'failed') {
+                const existingBooking = bookedSlots.find(b => b.student_id === demoOutcomeModal.id);
+                if (existingBooking) {
+                    await supabase.from('timeslots').delete().eq('id', existingBooking.id);
+                }
+                res = await supabase.from('students')
+                    .update({ status: 'unassigned', assigned_teacher_id: null, demo_status: 'failed' })
+                    .eq('id', demoOutcomeModal.id);
+            } else if (outcome === 'not_interested') {
+                const existingBooking = bookedSlots.find(b => b.student_id === demoOutcomeModal.id);
+                if (existingBooking) {
+                    await supabase.from('timeslots').delete().eq('id', existingBooking.id);
+                }
+                res = await supabase.from('students')
+                    .update({ status: 'not_interested', assigned_teacher_id: null, demo_status: 'failed' })
+                    .eq('id', demoOutcomeModal.id);
+            }
+
+            if (res?.error) {
+                alert(`Error: ${res.error.message}\nTip: Ensure your Supabase database schema allows 'finalized' and 'not_interested' status values and has 'demo_status' column.`);
+            } else {
+                setDemoOutcomeModal(null);
+                fetchAll();
+            }
+        } catch (err: any) {
+            alert(err.message);
+        } finally {
+            setSaving(false);
+        }
+    };
+
     const unassignStudent = async (student: Student) => {
         if (!confirm('Remove teacher assignment for this student?')) return;
         const existingBooking = bookedSlots.find(b => b.student_id === student.id);
         if (existingBooking) {
             await supabase.from('timeslots').delete().eq('id', existingBooking.id);
         }
-        await supabase.from('students').update({ assigned_teacher_id: null, status: 'unassigned' }).eq('id', student.id);
+        await supabase.from('students').update({ assigned_teacher_id: null, status: 'unassigned', demo_status: null }).eq('id', student.id);
         fetchAll();
     };
 
@@ -156,6 +200,7 @@ export default function StudentsPage() {
             'Preferred Date': s.preferred_date || 'N/A',
             'Preferred Slot': s.preferred_slot,
             'Status': s.status,
+            'Demo Status': s.demo_status || 'N/A',
             'Teacher': (s as any).teacher?.name || 'Unassigned',
             'Created At': formatDate(s.created_at)
         }));
@@ -194,9 +239,11 @@ export default function StudentsPage() {
                         <input className="input-field" style={{ paddingLeft: 36, width: 200 }} placeholder="Search..." value={search} onChange={(e) => setSearch(e.target.value)} />
                     </div>
                     <select className="input-field" style={{ width: 160 }} value={filterStatus} onChange={(e) => setFilterStatus(e.target.value as any)}>
-                        <option value="all">All Students</option>
+                        <option value="all">All Status</option>
                         <option value="unassigned">Unassigned</option>
-                        <option value="assigned">Assigned</option>
+                        <option value="assigned">Demo Scheduled</option>
+                        <option value="finalized">Finalized</option>
+                        <option value="not_interested">Not Interested</option>
                     </select>
                     <button className="btn-secondary" onClick={handleExport} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                         <Download size={16} /> Export Excel
@@ -208,11 +255,13 @@ export default function StudentsPage() {
             <div style={{ display: 'flex', gap: 12, marginBottom: 24, flexWrap: 'wrap' }}>
                 {[
                     { label: 'All', val: 'all', count: students.length, color: '#6366f1' },
-                    { label: 'Unassigned', val: 'unassigned', count: students.filter(s => s.status === 'unassigned').length, color: '#f59e0b' },
-                    { label: 'Assigned', val: 'assigned', count: students.filter(s => s.status === 'assigned').length, color: '#10b981' },
+                    { label: 'Unassigned', val: 'unassigned', count: students.filter(s => s.status === 'unassigned').length, color: '#94a3b8' },
+                    { label: 'Demo', val: 'assigned', count: students.filter(s => s.status === 'assigned').length, color: '#ef4444' }, /* Red */
+                    { label: 'Finalized', val: 'finalized', count: students.filter(s => s.status === 'finalized').length, color: '#10b981' }, /* Green */
+                    { label: 'Not Interested', val: 'not_interested', count: students.filter(s => s.status === 'not_interested').length, color: '#f59e0b' }, /* Yellow */
                 ].map(({ label, val, count, color }) => (
                     <button key={val} onClick={() => setFilterStatus(val as any)} style={{
-                        background: filterStatus === val ? `rgba(${color === '#6366f1' ? '99,102,241' : color === '#f59e0b' ? '245,158,11' : '16,185,129'},0.15)` : '#1e293b',
+                        background: filterStatus === val ? `rgba(${color === '#6366f1' ? '99,102,241' : color === '#94a3b8' ? '148,163,184' : color === '#ef4444' ? '239,68,68' : color === '#10b981' ? '16,185,129' : '245,158,11'},0.15)` : '#1e293b',
                         border: `1px solid ${filterStatus === val ? color : '#334155'}`,
                         borderRadius: 10, padding: '8px 16px', cursor: 'pointer',
                         color: filterStatus === val ? color : '#94a3b8',
@@ -278,9 +327,13 @@ export default function StudentsPage() {
                                                 <div style={{ color: '#64748b' }}>{s.preferred_slot}</div>
                                             </td>
                                             <td>
-                                                <span className={s.status === 'assigned' ? 'badge-assigned' : 'badge-unassigned'}
+                                                <span className={
+                                                    s.status === 'assigned' ? 'badge-assigned' :
+                                                        s.status === 'unassigned' ? 'badge-unassigned' :
+                                                            s.status === 'finalized' ? 'badge-active' : 'badge-warning'
+                                                }
                                                     style={{ padding: '3px 10px', borderRadius: 999, fontSize: 11, fontWeight: 700 }}>
-                                                    {s.status}
+                                                    {s.status === 'assigned' ? 'Demo' : s.status}
                                                 </span>
                                             </td>
                                             <td style={{ fontSize: 13 }}>
@@ -301,8 +354,15 @@ export default function StudentsPage() {
                                                         <button className="btn-primary" style={{ padding: '6px 12px', fontSize: 12 }} onClick={() => openAssign(s)}>
                                                             <UserPlus size={13} /> Assign
                                                         </button>
-                                                    ) : (
+                                                    ) : s.status === 'assigned' ? (
                                                         <>
+                                                            <button
+                                                                className="btn-success"
+                                                                style={{ padding: '6px 12px', fontSize: 12 }}
+                                                                onClick={() => setDemoOutcomeModal(s)}
+                                                            >
+                                                                <Check size={13} /> Result
+                                                            </button>
                                                             {teacher && (
                                                                 <a
                                                                     href={generateWhatsAppLink(teacher.mobile, teacher.name, s.name, s.standard, s.address, s.preferred_day, s.preferred_slot, s.mobile, s.preferred_date)}
@@ -316,14 +376,14 @@ export default function StudentsPage() {
                                                                         textDecoration: 'none',
                                                                     }}
                                                                 >
-                                                                    <MessageCircle size={13} /> WhatsApp
+                                                                    <MessageCircle size={13} />
                                                                 </a>
                                                             )}
                                                             <button className="btn-danger" style={{ padding: '6px 10px' }} onClick={() => unassignStudent(s)}>
                                                                 <UserX size={13} />
                                                             </button>
                                                         </>
-                                                    )}
+                                                    ) : null}
 
                                                     <button className="btn-danger" style={{ padding: '6px 10px', background: 'none', border: '1px solid #334155' }} onClick={() => deleteStudent(s.id)}>
                                                         <Trash2 size={13} color="#ef4444" />
@@ -335,6 +395,31 @@ export default function StudentsPage() {
                                 })}
                             </tbody>
                         </table>
+                    </div>
+                </div>
+            )}
+
+            {/* Outcome Modal */}
+            {demoOutcomeModal && (
+                <div className="modal-overlay" onClick={(e) => e.target === e.currentTarget && setDemoOutcomeModal(null)}>
+                    <div className="glass" style={{ borderRadius: 20, width: '100%', maxWidth: 460, padding: 32 }}>
+                        <h2 style={{ fontSize: 20, fontWeight: 700, marginBottom: 12 }}>Demo Outcome</h2>
+                        <p style={{ color: '#94a3b8', fontSize: 14, marginBottom: 24 }}>What was the result of the demo for <b>{demoOutcomeModal.name}</b>?</p>
+
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                            <button className="btn-success" onClick={() => handleDemoOutcome('successful')} style={{ justifyContent: 'center', padding: 14 }}>
+                                <CheckCircle size={18} /> Demo Successful (Finalize)
+                            </button>
+                            <button className="btn-warning" onClick={() => handleDemoOutcome('failed')} style={{ justifyContent: 'center', padding: 14, background: 'rgba(245,158,11,0.1)', color: '#f59e0b', borderColor: '#f59e0b' }}>
+                                <UserPlus size={18} /> Demo Failed (Re-assign)
+                            </button>
+                            <button className="btn-danger" onClick={() => handleDemoOutcome('not_interested')} style={{ justifyContent: 'center', padding: 14 }}>
+                                <UserX size={18} /> Student Not Interested
+                            </button>
+                            <button className="btn-secondary" onClick={() => setDemoOutcomeModal(null)} style={{ justifyContent: 'center', padding: 12, marginTop: 12 }}>
+                                Cancel
+                            </button>
+                        </div>
                     </div>
                 </div>
             )}

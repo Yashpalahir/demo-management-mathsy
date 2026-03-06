@@ -79,10 +79,39 @@ export default function TeachersPage() {
         fetchTeachers();
     };
 
+    const toggleDaySlot = (day: string, slot: string) => {
+        const val = `${day}|${slot}`;
+        setForm(prev => ({
+            ...prev,
+            available_slots: prev.available_slots.includes(val)
+                ? prev.available_slots.filter((x) => x !== val)
+                : [...prev.available_slots, val]
+        }));
+    };
+
+    const getSlotsForDay = (day: string) => {
+        return form.available_slots
+            .filter(s => s.startsWith(`${day}|`))
+            .map(s => s.split('|')[1]);
+    };
+
     const filtered = teachers.filter((t) =>
         t.name.toLowerCase().includes(search.toLowerCase()) ||
         t.subjects.some((s) => s.toLowerCase().includes(search.toLowerCase()))
     );
+
+    // Group slots by day for display
+    const groupSlotsByDay = (slots: string[]) => {
+        const grouped: Record<string, string[]> = {};
+        slots.forEach(s => {
+            if (s.includes('|')) {
+                const [day, slot] = s.split('|');
+                if (!grouped[day]) grouped[day] = [];
+                grouped[day].push(slot);
+            }
+        });
+        return grouped;
+    };
 
     return (
         <div className="animate-fadeIn">
@@ -128,82 +157,97 @@ export default function TeachersPage() {
                 </div>
             ) : (
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: 20 }}>
-                    {filtered.map((t) => (
-                        <div key={t.id} className="card-hover" style={{
-                            background: '#1e293b', borderRadius: 16, border: '1px solid #334155',
-                            padding: 20, position: 'relative', overflow: 'hidden',
-                        }}>
-                            {/* Color accent */}
-                            <div style={{
-                                position: 'absolute', top: 0, left: 0, right: 0, height: 3,
-                                background: t.status === 'active'
-                                    ? 'linear-gradient(90deg, #6366f1, #10b981)'
-                                    : 'linear-gradient(90deg, #475569, #334155)',
-                            }} />
+                    {filtered.map((t) => {
+                        const groupedSlots = groupSlotsByDay(t.available_slots);
+                        const daysWithSlots = Object.keys(groupedSlots);
 
-                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16 }}>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                                    <div style={{
-                                        width: 44, height: 44, borderRadius: 12,
-                                        background: 'linear-gradient(135deg, #6366f1, #8b5cf6)',
-                                        display: 'flex', alignItems: 'center', justifyContent: 'center',
-                                        fontSize: 18, fontWeight: 700, color: 'white',
-                                    }}>
-                                        {t.name.charAt(0).toUpperCase()}
-                                    </div>
-                                    <div>
-                                        <div style={{ fontWeight: 700, fontSize: 16, color: '#f1f5f9' }}>{t.name}</div>
-                                        <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginTop: 2 }}>
-                                            <Phone size={11} color="#6366f1" />
-                                            <span style={{ fontSize: 12, color: '#94a3b8' }}>{t.mobile}</span>
+                        return (
+                            <div key={t.id} className="card-hover" style={{
+                                background: '#1e293b', borderRadius: 16, border: '1px solid #334155',
+                                padding: 20, position: 'relative', overflow: 'hidden',
+                                display: 'flex', flexDirection: 'column'
+                            }}>
+                                {/* Color accent */}
+                                <div style={{
+                                    position: 'absolute', top: 0, left: 0, right: 0, height: 3,
+                                    background: t.status === 'active'
+                                        ? 'linear-gradient(90deg, #6366f1, #10b981)'
+                                        : 'linear-gradient(90deg, #475569, #334155)',
+                                }} />
+
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16 }}>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                                        <div style={{
+                                            width: 44, height: 44, borderRadius: 12,
+                                            background: 'linear-gradient(135deg, #6366f1, #8b5cf6)',
+                                            display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                            fontSize: 18, fontWeight: 700, color: 'white',
+                                        }}>
+                                            {t.name.charAt(0).toUpperCase()}
+                                        </div>
+                                        <div>
+                                            <div style={{ fontWeight: 700, fontSize: 16, color: '#f1f5f9' }}>{t.name}</div>
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginTop: 2 }}>
+                                                <Phone size={11} color="#6366f1" />
+                                                <span style={{ fontSize: 12, color: '#94a3b8' }}>{t.mobile}</span>
+                                            </div>
                                         </div>
                                     </div>
+                                    <button
+                                        onClick={() => toggleStatus(t)}
+                                        className={t.status === 'active' ? 'badge-active' : 'badge-inactive'}
+                                        style={{ padding: '4px 12px', borderRadius: 999, fontSize: 11, fontWeight: 700, cursor: 'pointer', border: 'none' }}
+                                    >
+                                        {t.status}
+                                    </button>
                                 </div>
-                                <button
-                                    onClick={() => toggleStatus(t)}
-                                    className={t.status === 'active' ? 'badge-active' : 'badge-inactive'}
-                                    style={{ padding: '4px 12px', borderRadius: 999, fontSize: 11, fontWeight: 700, cursor: 'pointer', border: 'none' }}
-                                >
-                                    {t.status}
-                                </button>
-                            </div>
 
-                            {/* Subjects */}
-                            <div style={{ marginBottom: 12 }}>
-                                <div style={{ fontSize: 11, color: '#64748b', fontWeight: 600, marginBottom: 6, letterSpacing: '0.05em' }}>SUBJECTS</div>
-                                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-                                    {t.subjects.map((s) => (
-                                        <span key={s} style={{
-                                            background: 'rgba(99,102,241,0.12)', color: '#818cf8',
-                                            padding: '2px 10px', borderRadius: 999, fontSize: 12, fontWeight: 500,
-                                        }}>{s}</span>
-                                    ))}
+                                {/* Subjects */}
+                                <div style={{ marginBottom: 16 }}>
+                                    <div style={{ fontSize: 11, color: '#64748b', fontWeight: 600, marginBottom: 8, letterSpacing: '0.05em' }}>SUBJECTS</div>
+                                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                                        {t.subjects.map((s) => (
+                                            <span key={s} style={{
+                                                background: 'rgba(99,102,241,0.12)', color: '#818cf8',
+                                                padding: '2px 10px', borderRadius: 999, fontSize: 11, fontWeight: 500,
+                                            }}>{s}</span>
+                                        ))}
+                                    </div>
+                                </div>
+
+                                {/* Day-wise Availability */}
+                                <div style={{ marginBottom: 20, flex: 1 }}>
+                                    <div style={{ fontSize: 11, color: '#64748b', fontWeight: 600, marginBottom: 8, letterSpacing: '0.05em' }}>AVAILABILITY</div>
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                                        {t.available_days.map(day => (
+                                            <div key={day} style={{ background: 'rgba(30, 41, 59, 0.5)', borderRadius: 8, padding: '6px 10px', border: '1px solid rgba(51, 65, 85, 0.5)' }}>
+                                                <div style={{ fontSize: 12, fontWeight: 600, color: '#f1f5f9', marginBottom: 2 }}>{day}</div>
+                                                <div style={{ fontSize: 11, color: '#94a3b8' }}>
+                                                    {groupedSlots[day]?.length > 0
+                                                        ? groupedSlots[day].join(', ')
+                                                        : <span style={{ fontStyle: 'italic', color: '#475569' }}>No slots selected</span>
+                                                    }
+                                                </div>
+                                            </div>
+                                        ))}
+                                        {t.available_days.length === 0 && (
+                                            <div style={{ fontSize: 12, color: '#475569', fontStyle: 'italic' }}>No days selected</div>
+                                        )}
+                                    </div>
+                                </div>
+
+                                {/* Actions */}
+                                <div style={{ display: 'flex', gap: 8, borderTop: '1px solid #334155', paddingTop: 16 }}>
+                                    <button className="btn-secondary" onClick={() => openEdit(t)} style={{ flex: 1, justifyContent: 'center', padding: '8px' }}>
+                                        <Pencil size={14} /> Edit
+                                    </button>
+                                    <button className="btn-danger" onClick={() => handleDelete(t.id)} style={{ padding: '8px 12px' }}>
+                                        <Trash2 size={14} />
+                                    </button>
                                 </div>
                             </div>
-
-                            {/* Days */}
-                            <div style={{ marginBottom: 12 }}>
-                                <div style={{ fontSize: 11, color: '#64748b', fontWeight: 600, marginBottom: 6, letterSpacing: '0.05em' }}>AVAILABLE DAYS</div>
-                                <div style={{ fontSize: 12, color: '#94a3b8' }}>{t.available_days.join(', ') || '—'}</div>
-                            </div>
-
-                            {/* Slots */}
-                            <div style={{ marginBottom: 16 }}>
-                                <div style={{ fontSize: 11, color: '#64748b', fontWeight: 600, marginBottom: 6, letterSpacing: '0.05em' }}>TIME SLOTS ({t.available_slots.length})</div>
-                                <div style={{ fontSize: 12, color: '#94a3b8' }}>{t.available_slots.slice(0, 2).join(', ')}{t.available_slots.length > 2 ? ` +${t.available_slots.length - 2} more` : ''}</div>
-                            </div>
-
-                            {/* Actions */}
-                            <div style={{ display: 'flex', gap: 8, borderTop: '1px solid #334155', paddingTop: 16 }}>
-                                <button className="btn-secondary" onClick={() => openEdit(t)} style={{ flex: 1, justifyContent: 'center', padding: '8px' }}>
-                                    <Pencil size={14} /> Edit
-                                </button>
-                                <button className="btn-danger" onClick={() => handleDelete(t.id)} style={{ padding: '8px 12px' }}>
-                                    <Trash2 size={14} />
-                                </button>
-                            </div>
-                        </div>
-                    ))}
+                        );
+                    })}
                 </div>
             )}
 
@@ -211,7 +255,7 @@ export default function TeachersPage() {
             {showModal && (
                 <div className="modal-overlay" onClick={(e) => e.target === e.currentTarget && setShowModal(false)}>
                     <div className="glass" style={{
-                        borderRadius: 20, width: '100%', maxWidth: 640,
+                        borderRadius: 20, width: '100%', maxWidth: 700,
                         maxHeight: '90vh', overflowY: 'auto', padding: 32,
                     }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
@@ -247,11 +291,15 @@ export default function TeachersPage() {
                                 </div>
                             </div>
 
-                            <div style={{ marginBottom: 20 }}>
-                                <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#94a3b8', marginBottom: 10 }}>Available Days *</label>
+                            <div style={{ marginBottom: 24 }}>
+                                <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#10b981', marginBottom: 12 }}>1. Select Available Days</label>
                                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
                                     {DAYS.map((d) => (
-                                        <label key={d} className="checkbox-label" style={{ background: form.available_days.includes(d) ? 'rgba(16,185,129,0.12)' : '', borderColor: form.available_days.includes(d) ? 'rgba(16,185,129,0.3)' : '' }}>
+                                        <label key={d} className="checkbox-label" style={{
+                                            background: form.available_days.includes(d) ? 'rgba(16,185,129,0.12)' : '',
+                                            borderColor: form.available_days.includes(d) ? 'rgba(16,185,129,0.3)' : '',
+                                            padding: '8px 16px'
+                                        }}>
                                             <input type="checkbox" checked={form.available_days.includes(d)} onChange={() => setForm({ ...form, available_days: toggleArray(form.available_days, d) })} />
                                             {d}
                                         </label>
@@ -259,17 +307,34 @@ export default function TeachersPage() {
                                 </div>
                             </div>
 
-                            <div style={{ marginBottom: 20 }}>
-                                <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#94a3b8', marginBottom: 10 }}>Available Time Slots *</label>
-                                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-                                    {TIME_SLOTS.map((sl) => (
-                                        <label key={sl} className="checkbox-label" style={{ background: form.available_slots.includes(sl) ? 'rgba(245,158,11,0.12)' : '', borderColor: form.available_slots.includes(sl) ? 'rgba(245,158,11,0.3)' : '' }}>
-                                            <input type="checkbox" checked={form.available_slots.includes(sl)} onChange={() => setForm({ ...form, available_slots: toggleArray(form.available_slots, sl) })} />
-                                            {sl}
-                                        </label>
-                                    ))}
+                            {form.available_days.length > 0 && (
+                                <div style={{ marginBottom: 24, padding: 20, background: 'rgba(15, 23, 42, 0.4)', borderRadius: 16, border: '1px solid #334155' }}>
+                                    <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#f59e0b', marginBottom: 16 }}>2. Assign Time Slots for Each Day</label>
+
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+                                        {form.available_days.map(day => (
+                                            <div key={day} style={{ borderBottom: '1px solid #334155', paddingBottom: 16 }}>
+                                                <div style={{ fontSize: 14, fontWeight: 700, color: '#f1f5f9', marginBottom: 10 }}>{day}</div>
+                                                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                                                    {TIME_SLOTS.map((sl) => {
+                                                        const isSelected = form.available_slots.includes(`${day}|${sl}`);
+                                                        return (
+                                                            <label key={`${day}-${sl}`} className="checkbox-label" style={{
+                                                                background: isSelected ? 'rgba(245,158,11,0.12)' : '',
+                                                                borderColor: isSelected ? 'rgba(245,158,11,0.3)' : '',
+                                                                fontSize: 11
+                                                            }}>
+                                                                <input type="checkbox" checked={isSelected} onChange={() => toggleDaySlot(day, sl)} />
+                                                                {sl}
+                                                            </label>
+                                                        );
+                                                    })}
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
                                 </div>
-                            </div>
+                            )}
 
                             <div style={{ marginBottom: 24 }}>
                                 <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#94a3b8', marginBottom: 8 }}>Status</label>

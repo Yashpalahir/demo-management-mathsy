@@ -35,7 +35,8 @@ create table if not exists students (
   preferred_day text not null,
   preferred_slot text not null,
   assigned_teacher_id uuid references teachers(id) on delete set null,
-  status text default 'unassigned' check (status in ('unassigned', 'assigned')),
+  status text default 'unassigned' check (status in ('unassigned', 'assigned', 'finalized', 'not_interested')),
+  demo_status text default 'pending' check (demo_status in ('pending', 'successful', 'failed')),
   created_at timestamptz default now()
 );
 

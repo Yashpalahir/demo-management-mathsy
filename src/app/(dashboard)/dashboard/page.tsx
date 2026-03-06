@@ -7,7 +7,7 @@ import { isToday } from '@/lib/utils';
 import {
     Users, GraduationCap, UserCheck, UserX,
     CalendarCheck, TrendingUp, BarChart3, Activity,
-    PieChart as PieIcon, BarChart as BarIcon
+    PieChart as PieIcon, BarChart as BarIcon, CheckCircle, Clock
 } from 'lucide-react';
 import {
     PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend,
@@ -51,6 +51,7 @@ export default function DashboardPage() {
 
             const assigned = students.filter((s) => s.status === 'assigned');
             const unassigned = students.filter((s) => s.status === 'unassigned');
+            const finalized = students.filter((s) => s.status === 'finalized');
             const todayDemos = assigned.filter((s) => isToday(s.created_at));
 
             setStats({
@@ -58,7 +59,7 @@ export default function DashboardPage() {
                 assigned_students: assigned.length,
                 unassigned_students: unassigned.length,
                 active_teachers: activeTeachers.length,
-                todays_demos: todayDemos.length,
+                todays_demos: todayDemos.length, // Keeping legacy name but using it properly
             });
 
             // Prepare Chart Data
@@ -71,8 +72,10 @@ export default function DashboardPage() {
             setSubjectData(Object.keys(subjects).map(key => ({ name: key, value: subjects[key] })).sort((a, b) => b.value - a.value).slice(0, 5));
 
             setStatusData([
-                { name: 'Assigned', value: assigned.length },
-                { name: 'Unassigned', value: unassigned.length }
+                { name: 'Pending Demo', value: assigned.length },
+                { name: 'Finalized', value: finalized.length },
+                { name: 'Unassigned', value: unassigned.length },
+                { name: 'Not Interested', value: students.filter(s => s.status === 'not_interested').length }
             ]);
 
             setRecentStudents(students.slice(0, 5));
@@ -87,18 +90,25 @@ export default function DashboardPage() {
 
     const statCards = [
         {
-            title: 'Total Students',
+            title: 'Total Inquiries',
             value: stats.total_students,
             icon: GraduationCap,
             color: '#6366f1',
             bg: 'rgba(99,102,241,0.1)',
         },
         {
-            title: 'Assigned',
-            value: stats.assigned_students,
-            icon: UserCheck,
+            title: 'Successful Demos',
+            value: statusData.find(d => d.name === 'Finalized')?.value || 0,
+            icon: CheckCircle,
             color: '#10b981',
             bg: 'rgba(16,185,129,0.1)',
+        },
+        {
+            title: 'Pending Demos',
+            value: stats.assigned_students,
+            icon: Clock,
+            color: '#06b6d4',
+            bg: 'rgba(6,182,212,0.1)',
         },
         {
             title: 'Unassigned',
@@ -108,18 +118,11 @@ export default function DashboardPage() {
             bg: 'rgba(245,158,11,0.1)',
         },
         {
-            title: 'Active Teachers',
-            value: stats.active_teachers,
-            icon: Users,
+            title: 'Demo Success Rate',
+            value: `${stats.total_students ? Math.round(((statusData.find(d => d.name === 'Finalized')?.value || 0) / (stats.total_students - stats.unassigned_students)) * 100) : 0}%`,
+            icon: TrendingUp,
             color: '#8b5cf6',
             bg: 'rgba(139,92,246,0.1)',
-        },
-        {
-            title: "Today's Demos",
-            value: stats.todays_demos,
-            icon: CalendarCheck,
-            color: '#06b6d4',
-            bg: 'rgba(6,182,212,0.1)',
         },
     ];
 

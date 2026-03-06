@@ -30,7 +30,8 @@ export type Student = {
     preferred_date?: string;
     preferred_slot: string;
     assigned_teacher_id: string | null;
-    status: 'unassigned' | 'assigned';
+    status: 'unassigned' | 'assigned' | 'finalized' | 'not_interested';
+    demo_status: 'pending' | 'successful' | 'failed' | null;
     created_at: string;
     teacher?: Teacher;
 };

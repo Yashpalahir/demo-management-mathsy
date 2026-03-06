@@ -4,24 +4,68 @@ import { useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import { type Student, type Teacher } from '@/lib/supabase';
 import { generateWhatsAppLink, formatDate } from '@/lib/utils';
-import { UserCheck, MessageCircle, Search, Filter, CheckCircle2 } from 'lucide-react';
+import { UserCheck, MessageCircle, Search, Filter, CheckCircle2, CheckCircle, XCircle } from 'lucide-react';
 
 export default function AssignmentsPage() {
     const [assignments, setAssignments] = useState<Student[]>([]);
     const [loading, setLoading] = useState(true);
     const [search, setSearch] = useState('');
 
+    const [bookedSlots, setBookedSlots] = useState<any[]>([]);
+    const [demoOutcomeModal, setDemoOutcomeModal] = useState<Student | null>(null);
+    const [saving, setSaving] = useState(false);
+
     useEffect(() => { fetchAssignments(); }, []);
 
     const fetchAssignments = async () => {
         setLoading(true);
-        const { data } = await supabase
-            .from('students')
-            .select('*, teacher:teachers(*)')
-            .eq('status', 'assigned')
-            .order('created_at', { ascending: false });
-        setAssignments(data || []);
+        const [sRes, bRes] = await Promise.all([
+            supabase.from('students').select('*, teacher:teachers(*)').eq('status', 'assigned').order('created_at', { ascending: false }),
+            supabase.from('timeslots').select('*').eq('is_booked', true),
+        ]);
+        setAssignments(sRes.data || []);
+        setBookedSlots(bRes.data || []);
         setLoading(false);
+    };
+
+    const handleDemoOutcome = async (outcome: 'successful' | 'failed' | 'not_interested') => {
+        if (!demoOutcomeModal) return;
+        setSaving(true);
+        try {
+            let res;
+            if (outcome === 'successful') {
+                res = await supabase.from('students')
+                    .update({ status: 'finalized', demo_status: 'successful' })
+                    .eq('id', demoOutcomeModal.id);
+            } else if (outcome === 'failed') {
+                const existingBooking = bookedSlots.find(b => b.student_id === demoOutcomeModal.id);
+                if (existingBooking) {
+                    await supabase.from('timeslots').delete().eq('id', existingBooking.id);
+                }
+                res = await supabase.from('students')
+                    .update({ status: 'unassigned', assigned_teacher_id: null, demo_status: 'failed' })
+                    .eq('id', demoOutcomeModal.id);
+            } else if (outcome === 'not_interested') {
+                const existingBooking = bookedSlots.find(b => b.student_id === demoOutcomeModal.id);
+                if (existingBooking) {
+                    await supabase.from('timeslots').delete().eq('id', existingBooking.id);
+                }
+                res = await supabase.from('students')
+                    .update({ status: 'not_interested', assigned_teacher_id: null, demo_status: 'failed' })
+                    .eq('id', demoOutcomeModal.id);
+            }
+
+            if (res?.error) {
+                alert(`Error: ${res.error.message}\nEnsure your database schema (students table) has 'demo_status' column and allowing 'finalized' status.`);
+            } else {
+                setDemoOutcomeModal(null);
+                fetchAssignments();
+            }
+        } catch (err: any) {
+            alert(err.message);
+        } finally {
+            setSaving(false);
+        }
     };
 
     const filtered = assignments.filter((s) =>
@@ -41,15 +85,40 @@ export default function AssignmentsPage() {
                         }}>
                             <UserCheck size={18} color="white" />
                         </div>
-                        <h1 style={{ fontSize: 24, fontWeight: 700 }}>Assignments</h1>
+                        <h1 style={{ fontSize: 24, fontWeight: 700 }}>Assignments / Demos</h1>
                     </div>
-                    <p style={{ color: '#94a3b8', fontSize: 14 }}>{assignments.length} active teacher-student assignments</p>
+                    <p style={{ color: '#94a3b8', fontSize: 14 }}>{assignments.length} demos currently scheduled</p>
                 </div>
                 <div style={{ position: 'relative' }}>
                     <Search size={15} style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: '#475569' }} />
                     <input className="input-field" style={{ paddingLeft: 36, width: 220 }} placeholder="Search assignments..." value={search} onChange={(e) => setSearch(e.target.value)} />
                 </div>
             </div>
+
+            {/* Outcome Modal */}
+            {demoOutcomeModal && (
+                <div className="modal-overlay" onClick={(e) => e.target === e.currentTarget && setDemoOutcomeModal(null)}>
+                    <div className="glass" style={{ borderRadius: 20, width: '100%', maxWidth: 460, padding: 32 }}>
+                        <h2 style={{ fontSize: 20, fontWeight: 700, marginBottom: 12 }}>Demo Outcome</h2>
+                        <p style={{ color: '#94a3b8', fontSize: 14, marginBottom: 24 }}>What was the result of the demo for <b>{demoOutcomeModal.name}</b>?</p>
+
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                            <button className="btn-success" onClick={() => handleDemoOutcome('successful')} style={{ justifyContent: 'center', padding: 14 }}>
+                                <CheckCircle size={18} /> Demo Successful (Finalize)
+                            </button>
+                            <button className="btn-warning" onClick={() => handleDemoOutcome('failed')} style={{ justifyContent: 'center', padding: 14, background: 'rgba(245,158,11,0.1)', color: '#f59e0b', borderColor: '#f59e0b' }}>
+                                <UserCheck size={18} /> Demo Failed (Re-assign)
+                            </button>
+                            <button className="btn-danger" onClick={() => handleDemoOutcome('not_interested')} style={{ justifyContent: 'center', padding: 14 }}>
+                                <XCircle size={18} /> Student Not Interested
+                            </button>
+                            <button className="btn-secondary" onClick={() => setDemoOutcomeModal(null)} style={{ justifyContent: 'center', padding: 12, marginTop: 12 }}>
+                                Cancel
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
 
             {loading ? (
                 <div style={{ textAlign: 'center', padding: 60, color: '#475569' }}>Loading...</div>
@@ -70,21 +139,22 @@ export default function AssignmentsPage() {
                             <div key={s.id} className="card-hover" style={{
                                 background: '#1e293b', borderRadius: 16, border: '1px solid #334155',
                                 padding: 20, position: 'relative', overflow: 'hidden',
+                                display: 'flex', flexDirection: 'column'
                             }}>
                                 <div style={{
                                     position: 'absolute', top: 0, left: 0, right: 0, height: 3,
-                                    background: 'linear-gradient(90deg, #10b981, #06b6d4)',
+                                    background: 'linear-gradient(90deg, #ef4444, #991b1b)',
                                 }} />
 
                                 {/* Assigned badge */}
                                 <div style={{
                                     position: 'absolute', top: 16, right: 16,
-                                    background: 'rgba(16,185,129,0.15)', color: '#10b981',
-                                    border: '1px solid rgba(16,185,129,0.3)',
+                                    background: 'rgba(239,68,68,0.15)', color: '#ef4444',
+                                    border: '1px solid rgba(239,68,68,0.3)',
                                     borderRadius: 999, padding: '2px 10px', fontSize: 11, fontWeight: 700,
                                     display: 'flex', alignItems: 'center', gap: 4,
                                 }}>
-                                    <CheckCircle2 size={11} /> Assigned
+                                    <CheckCircle2 size={11} /> Demo Status: {s.demo_status || 'Pending'}
                                 </div>
 
                                 {/* Student info */}
@@ -120,7 +190,7 @@ export default function AssignmentsPage() {
                                 )}
 
                                 {/* Slot info */}
-                                <div style={{ display: 'flex', gap: 12, marginBottom: 16 }}>
+                                <div style={{ display: 'flex', gap: 12, marginBottom: 20, flex: 1 }}>
                                     <div style={{ background: '#0f172a', borderRadius: 8, padding: '8px 12px', flex: 1 }}>
                                         <div style={{ fontSize: 10, color: '#64748b', fontWeight: 600, marginBottom: 2 }}>DAY</div>
                                         <div style={{ fontSize: 13, color: '#f1f5f9', fontWeight: 600 }}>{s.preferred_day}</div>
@@ -131,23 +201,32 @@ export default function AssignmentsPage() {
                                     </div>
                                 </div>
 
-                                {/* WhatsApp button */}
-                                {teacher && (
-                                    <a
-                                        href={waLink}
-                                        target="_blank"
-                                        rel="noopener noreferrer"
-                                        style={{
-                                            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
-                                            background: 'linear-gradient(135deg, #25d366, #128c7e)',
-                                            color: 'white', borderRadius: 10, padding: '10px 16px',
-                                            textDecoration: 'none', fontWeight: 700, fontSize: 14,
-                                            transition: 'all 0.2s', boxShadow: '0 4px 15px rgba(37,211,102,0.2)',
-                                        }}
+                                {/* Action Buttons */}
+                                <div style={{ display: 'flex', gap: 10 }}>
+                                    <button
+                                        className="btn-success"
+                                        onClick={() => setDemoOutcomeModal(s)}
+                                        style={{ flex: 1, justifyContent: 'center', fontSize: 13 }}
                                     >
-                                        <MessageCircle size={16} /> Send WhatsApp to Teacher
-                                    </a>
-                                )}
+                                        <CheckCircle size={14} /> Mark Result
+                                    </button>
+                                    {teacher && (
+                                        <a
+                                            href={waLink}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            style={{
+                                                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                                background: 'rgba(37,211,102,0.1)', color: '#25d366',
+                                                border: '1px solid rgba(37,211,102,0.2)',
+                                                borderRadius: 10, width: 44, padding: 0
+                                            }}
+                                            title="WhatsApp Teacher"
+                                        >
+                                            <MessageCircle size={18} />
+                                        </a>
+                                    )}
+                                </div>
                             </div>
                         );
                     })}
